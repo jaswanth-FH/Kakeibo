@@ -6,14 +6,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { categoryOf, Receipt } from '@/components/receipt/Receipt';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { SAMPLE_TXNS } from '@/db/sample';
-import { SEED_CATEGORIES } from '@/db/seed';
+import { useCategories, useLiveQuery } from '@/db/provider';
 import { useTokens } from '@/lib/use-tokens';
 
 export default function TxnDetail() {
   const t = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const txn = SAMPLE_TXNS.find((x) => x.id === id);
+  const categories = useCategories();
+  // null = looked up and not found; undefined = still loading.
+  const txn = useLiveQuery(
+    async (db) =>
+      (await db.selectFrom('transactions').selectAll().where('id', '=', id).executeTakeFirst()) ??
+      null,
+    [id],
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-bg">
@@ -22,20 +28,22 @@ export default function TxnDetail() {
           <ArrowLeft size={22} strokeWidth={1.8} color={t.text} />
         </Button>
       </View>
-      {txn ? (
+      {txn && categories.length ? (
         <ScrollView contentContainerClassName="px-5 pb-6">
           <Receipt
             status={txn.status}
             amountPaise={txn.amountPaise}
-            payeeName={txn.payeeName}
-            category={categoryOf(txn.categoryId, SEED_CATEGORIES)}
-            app="Google Pay"
-            when={txn.createdAt}
+            payeeName={txn.payeeName ?? txn.payeeVpa}
+            category={categoryOf(txn.categoryId, categories)}
+            note={txn.note ?? undefined}
+            upiRef={txn.upiApprovalRef ?? txn.upiTxnId ?? undefined}
+            app={txn.upiApp ?? undefined}
+            when={new Date(txn.createdAt)}
           />
         </ScrollView>
-      ) : (
+      ) : txn === null ? (
         <Text className="p-5 text-muted">Transaction not found.</Text>
-      )}
+      ) : null}
       {txn?.status === 'pending' ? (
         <View className="px-5 pb-4">
           <Button onPress={() => router.push('/pay/confirm')}>

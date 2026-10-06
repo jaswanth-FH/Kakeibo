@@ -23,3 +23,16 @@ export function previousRange(kind: PeriodKind, range: Range): Range {
 export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
+
+/** The period of the same kind just after `range`. */
+export function nextRange(kind: PeriodKind, range: Range): Range {
+  return periodRange(kind, range.end);
+}
+
+/** "October", "Q4" or "6 Oct" (week start). */
+export function periodLabel(kind: PeriodKind, range: Range): string {
+  const d = range.start;
+  if (kind === 'month') return d.toLocaleDateString('en-IN', { month: 'long' });
+  if (kind === 'quarter') return `Q${Math.floor(d.getMonth() / 3) + 1}`;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}

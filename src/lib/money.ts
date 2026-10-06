@@ -16,3 +16,8 @@ export function formatPaiseCompact(paise: number): string {
     rupees >= 1e7 ? [1e7, 'Cr'] : rupees >= 1e5 ? [1e5, 'L'] : rupees >= 1e3 ? [1e3, 'K'] : [1, ''];
   return `₹${Number((rupees / div).toFixed(2))}${unit}`;
 }
+
+/** Whole-percent change; 0 when there's nothing to compare against. */
+export function pctChange(now: number, prev: number) {
+  return prev ? Math.round(((now - prev) / prev) * 100) : 0;
+}

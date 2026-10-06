@@ -1,5 +1,13 @@
+import { addDatabaseChangeListener } from 'expo-sqlite';
 import { useColorScheme } from 'nativewind';
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type DependencyList,
+  type ReactNode,
+} from 'react';
 
 import { getSetting, openDatabase } from '@/db/client';
 import type { Db } from '@/db/sqlite';
@@ -42,4 +50,38 @@ export function useDb(): Db {
   const db = useContext(DbContext);
   if (!db) throw new Error('useDb must be used inside <DatabaseProvider>');
   return db;
+}
+
+/**
+ * Runs `query` now and again after any write to the database. `undefined` until the first result.
+ * Re-runs when `deps` change, like useEffect.
+ */
+export function useLiveQuery<T>(
+  query: (db: Db) => Promise<T>,
+  deps: DependencyList,
+): T | undefined {
+  const db = useDb();
+  const [data, setData] = useState<T>();
+  useEffect(() => {
+    let alive = true;
+    const run = () => query(db).then((r) => alive && setData(r));
+    run();
+    const sub = addDatabaseChangeListener(run);
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, ...deps]);
+  return data;
+}
+
+/** All categories in display order, live from the categories table. Empty until loaded. */
+export function useCategories() {
+  return (
+    useLiveQuery(
+      (db) => db.selectFrom('categories').selectAll().orderBy('sortOrder').execute(),
+      [],
+    ) ?? []
+  );
 }

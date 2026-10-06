@@ -7,31 +7,51 @@ import { Avatar } from '@/components/Avatar';
 import { TxnRow } from '@/components/TxnRow';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import {
-  pctChange,
-  SAMPLE_PROFILE,
-  SAMPLE_TODAY,
-  SAMPLE_TXNS,
-  sampleMonthComparison,
-} from '@/db/sample';
-import { formatPaise } from '@/lib/money';
+import { getSetting } from '@/db/client';
+import { useCategories, useLiveQuery } from '@/db/provider';
+import type { Db } from '@/db/sqlite';
+import { periodTotal, topIncrease, totalsByCategory } from '@/features/insights/queries';
+import { periodLabel, periodRange, previousRange } from '@/lib/dates';
+import { formatPaise, pctChange } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
-const { rows, total, prevTotal } = sampleMonthComparison();
-const spent = rows.filter((c) => c.paise > 0);
-const diff = total - prevTotal;
-// Headline insight: the biggest category that went up.
-const riser = spent.find((c) => c.paise > c.prevPaise);
-const recent = [...SAMPLE_TXNS]
-  .filter(
-    (x) => x.createdAt.toDateString() === SAMPLE_TODAY.toDateString() && x.status === 'success',
-  )
-  .sort((a, b) => +b.createdAt - +a.createdAt);
-const hour = SAMPLE_TODAY.getHours();
-const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+async function homeData(db: Db) {
+  const month = periodRange('month', new Date());
+  const prev = previousRange('month', month);
+  const [name, total, prevTotal, byCategory, riser, recent] = await Promise.all([
+    getSetting(db, 'name'),
+    periodTotal(db, month),
+    periodTotal(db, prev),
+    totalsByCategory(db, month),
+    topIncrease(db, month, prev),
+    db.selectFrom('transactions').selectAll().orderBy('createdAt', 'desc').limit(3).execute(),
+  ]);
+  return {
+    name,
+    month: periodLabel('month', month),
+    prevMonth: periodLabel('month', prev),
+    total,
+    prevTotal,
+    byCategory,
+    riser,
+    recent,
+  };
+}
+
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+}
 
 export default function Home() {
   const t = useTokens();
+  const data = useLiveQuery(homeData, []);
+  const categories = useCategories();
+  const cat = (id: string) => categories.find((c) => c.id === id);
+  if (!data) return <SafeAreaView className="flex-1 bg-bg" />;
+  const { name, month, prevMonth, total, prevTotal, byCategory, riser, recent } = data;
+  const diff = total - prevTotal;
+  const riserCat = riser && cat(riser.categoryId);
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <ScrollView contentContainerClassName="gap-4 px-5 pb-8 pt-4">
@@ -42,12 +62,10 @@ export default function Home() {
             className="flex-row items-center gap-3"
             onPress={() => router.push('/settings')}
           >
-            <Avatar name={SAMPLE_PROFILE.name} />
+            <Avatar name={name ?? ''} />
             <View>
-              <Text className="text-muted">{greeting}</Text>
-              <Text className="font-extrabold text-[17px]">
-                {SAMPLE_PROFILE.name.split(' ')[0]}
-              </Text>
+              <Text className="text-muted">{greeting()}</Text>
+              <Text className="font-extrabold text-[17px]">{name?.split(' ')[0] ?? 'Hi'}</Text>
             </View>
           </Pressable>
           <Button variant="icon" accessibilityLabel="Notifications">
@@ -55,44 +73,56 @@ export default function Home() {
           </Button>
         </View>
 
-        <Pressable
-          role="button"
-          className="gap-3 rounded-card bg-surface p-5 active:opacity-80"
-          onPress={() => router.push('/insights')}
-        >
-          <View className="flex-row items-center justify-between">
-            <Text className="text-muted">Spent in October</Text>
-            <ChevronRight size={18} strokeWidth={1.8} color={t.muted} />
+        {recent.length === 0 ? (
+          <View className="items-center gap-2 rounded-card bg-surface p-8">
+            <ScanLine size={32} strokeWidth={1.8} color={t.muted} />
+            <Text className="text-center text-muted">Scan your first QR to start tracking</Text>
           </View>
-          <Text className="font-extrabold text-[40px] tracking-[-1.5px]">{formatPaise(total)}</Text>
-          <Text className="text-muted">
-            {formatPaise(Math.abs(diff))} {diff >= 0 ? 'more' : 'less'} than September
-          </Text>
-          <View className="mt-1 h-3 flex-row gap-1">
-            {spent.map((c) => (
-              <View
-                key={c.id}
-                className="rounded-pill"
-                style={{ flex: c.paise, backgroundColor: c.color }}
-              />
-            ))}
-          </View>
-          <View className="flex-row flex-wrap gap-x-4 gap-y-1">
-            {spent.slice(0, 4).map((c) => (
-              <View key={c.id} className="flex-row items-center gap-1.5">
-                <View className="h-2 w-2 rounded-full" style={{ backgroundColor: c.color }} />
-                <Text className="text-[13px] text-muted">{c.name}</Text>
-              </View>
-            ))}
-          </View>
-        </Pressable>
+        ) : (
+          <Pressable
+            role="button"
+            className="gap-3 rounded-card bg-surface p-5 active:opacity-80"
+            onPress={() => router.push('/insights')}
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-muted">Spent in {month}</Text>
+              <ChevronRight size={18} strokeWidth={1.8} color={t.muted} />
+            </View>
+            <Text className="font-extrabold text-[40px] tracking-[-1.5px]">
+              {formatPaise(total)}
+            </Text>
+            <Text className="text-muted">
+              {formatPaise(Math.abs(diff))} {diff >= 0 ? 'more' : 'less'} than {prevMonth}
+            </Text>
+            <View className="mt-1 h-3 flex-row gap-1">
+              {byCategory.map((c) => (
+                <View
+                  key={c.categoryId}
+                  className="rounded-pill"
+                  style={{ flex: c.totalPaise, backgroundColor: cat(c.categoryId)?.color }}
+                />
+              ))}
+            </View>
+            <View className="flex-row flex-wrap gap-x-4 gap-y-1">
+              {byCategory.slice(0, 4).map((c) => (
+                <View key={c.categoryId} className="flex-row items-center gap-1.5">
+                  <View
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: cat(c.categoryId)?.color }}
+                  />
+                  <Text className="text-[13px] text-muted">{cat(c.categoryId)?.name}</Text>
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        )}
 
         <Button onPress={() => router.push('/scan')}>
           <ScanLine size={20} strokeWidth={1.8} color={t['on-primary']} />
           <Text>Scan & pay</Text>
         </Button>
 
-        {riser && (
+        {riser && riserCat && prevTotal > 0 && (
           <Pressable
             role="button"
             className="flex-row items-center gap-4 rounded-card border-[1.5px] border-line p-4 active:opacity-80"
@@ -100,15 +130,15 @@ export default function Home() {
           >
             <View
               className="h-10 w-10 items-center justify-center rounded-full"
-              style={{ backgroundColor: riser.color }}
+              style={{ backgroundColor: riserCat.color }}
             >
               <TrendingUp size={18} strokeWidth={1.8} color={t.ink} />
             </View>
             <View className="flex-1">
               <Text className="font-semibold">
-                {riser.name} is up {pctChange(riser.paise, riser.prevPaise)}% this month
+                {riserCat.name} is up {pctChange(riser.current, riser.previous)}% this month
               </Text>
-              <Text className="text-muted">Compare with September</Text>
+              <Text className="text-muted">Compare with {prevMonth}</Text>
             </View>
             <ChevronRight size={18} strokeWidth={1.8} color={t.muted} />
           </Pressable>
@@ -125,8 +155,8 @@ export default function Home() {
           </Pressable>
         </View>
         <View>
-          {recent.slice(0, 3).map((x) => (
-            <TxnRow key={x.id} txn={x} />
+          {recent.map((x) => (
+            <TxnRow key={x.id} txn={x} category={cat(x.categoryId)} />
           ))}
         </View>
       </ScrollView>
