@@ -20,7 +20,7 @@ const buttonVariants = cva('flex-row items-center justify-center gap-2 active:op
 const buttonTextVariants = cva('font-semibold text-base', {
   variants: {
     variant: {
-      default: 'text-primary-foreground',
+      default: 'font-bold text-on-primary',
       outline: 'text-text',
       ghost: 'text-text',
       icon: 'text-text',

@@ -1,26 +1,15 @@
-const { colors } = require('./src/lib/tokens');
+const { fixed, themes } = require('./src/lib/theme');
+
+const themed = Object.fromEntries(Object.keys(themes.dark).map((k) => [k, `var(--${k})`]));
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
-      colors: {
-        ...colors,
-        // React Native Reusables class names, mapped straight to our tokens (dark only, no CSS vars needed)
-        background: colors.bg,
-        foreground: colors.text,
-        card: colors.surface,
-        popover: colors.surface,
-        primary: { DEFAULT: colors.text, foreground: colors.ink },
-        secondary: { DEFAULT: colors.surface, foreground: colors.text },
-        accent: { DEFAULT: colors['surface-2'], foreground: colors.text },
-        'muted-foreground': colors.muted,
-        border: colors.line,
-        input: colors.line,
-        destructive: colors.bad,
-      },
+      colors: { ...themed, ...fixed },
       fontFamily: {
         sans: ['Figtree_400Regular'],
         medium: ['Figtree_500Medium'],

@@ -58,7 +58,7 @@ npm test                  jest unit tests
 3. **Save before paying.** Insert the transaction as `pending` before launching the UPI app, then update it. A user who never comes back must still have a record.
 4. **Do not rewrite merchant QR links.** If the scanned QR already contains `am` or `sign`, pass the original `upi://` string to the UPI app unchanged; editing it can break the merchant's signature. Only build a fresh link for QRs without an amount (personal QRs).
 5. **Android only for payments.** On iOS, scanning, tagging and insights still work, but the Pay button explains that payments need Android. Guard with `Platform.OS`.
-6. **Match the design.** Dark theme only for v1. Use tokens from `tailwind.config.js`, never raw hex in components. Touch targets at least 44 px. Every icon-only button gets an `accessibilityLabel`.
+6. **Match the design.** Dark and light themes; colors live once in `src/lib/theme.js` (classNames via `tailwind.config.js`, JS props via `useTokens()`), never raw hex in components. The Scan screen is always dark. Touch targets at least 44 px. Every icon-only button gets an `accessibilityLabel`.
 7. **Category colors are fixed** and come from the `categories` table, so a category looks the same on every screen.
 8. **Tests:** the UPI link parser, the UPI response parser, money formatting and the monthly aggregation queries must have unit tests.
 9. Keep components small and typed. No `any`. No new dependencies without saying why in the PR or commit message.

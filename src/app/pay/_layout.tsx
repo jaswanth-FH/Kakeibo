@@ -1,9 +1,19 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '@/lib/tokens';
+import { useTokens } from '@/lib/use-tokens';
 
 export default function PayLayout() {
+  const t = useTokens();
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
+      <Stack.Screen
+        name="choose-app"
+        options={{
+          presentation: 'transparentModal',
+          animation: 'fade',
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      />
+    </Stack>
   );
 }

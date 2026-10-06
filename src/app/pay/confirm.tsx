@@ -1,0 +1,96 @@
+import { router } from 'expo-router';
+import { Clock } from 'lucide-react-native';
+import { Pressable, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { CategoryLabel, categoryOf, StatusCircle } from '@/components/receipt/Receipt';
+import { Text } from '@/components/ui/text';
+import { SAMPLE_DRAFT } from '@/db/sample';
+import { SEED_CATEGORIES } from '@/db/seed';
+import { formatPaise } from '@/lib/money';
+import { useTokens } from '@/lib/use-tokens';
+
+function Answer({
+  ok,
+  title,
+  subtitle,
+  onPress,
+}: {
+  ok: boolean;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      role="button"
+      onPress={onPress}
+      className={`flex-row items-center gap-4 rounded-[30px] border-2 bg-surface px-5 py-5 active:opacity-80 ${ok ? 'border-ok' : 'border-bad'}`}
+    >
+      <StatusCircle ok={ok} size={56} />
+      <View className="flex-1">
+        <Text className="font-extrabold text-xl">{title}</Text>
+        <Text className="text-muted">{subtitle}</Text>
+      </View>
+    </Pressable>
+  );
+}
+
+export default function Confirm() {
+  const t = useTokens();
+  const d = SAMPLE_DRAFT;
+  const category = categoryOf(d.categoryId, SEED_CATEGORIES);
+  return (
+    <SafeAreaView className="flex-1 bg-bg">
+      <View className="flex-1 gap-6 px-5 pt-16">
+        <View className="flex-row items-center gap-3 rounded-card bg-surface px-3.5 py-3">
+          <View
+            className="h-11 w-11 items-center justify-center rounded-pill"
+            style={{ backgroundColor: category.color }}
+          >
+            <Text className="font-bold text-ink">{d.payeeName[0]}</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="font-semibold text-base">{d.payeeName}</Text>
+            <CategoryLabel category={category} />
+          </View>
+          <Text className="font-extrabold text-2xl">{formatPaise(d.amountPaise)}</Text>
+        </View>
+        <View className="gap-3">
+          <Text className="font-extrabold text-[34px] leading-[40px]">
+            Did the payment go through?
+          </Text>
+          <Text className="text-base leading-6 text-muted">
+            {d.upiApp} didn&apos;t send a clear result. A quick look at its success screen or your
+            bank SMS tells you.
+          </Text>
+        </View>
+      </View>
+      <View className="gap-3 px-5 pb-2">
+        <Answer
+          ok
+          title="Yes, it's paid"
+          subtitle={`Saved to ${category.name}`}
+          onPress={() => router.replace('/pay/success')}
+        />
+        <Answer
+          ok={false}
+          title="No, it failed"
+          subtitle="Nothing is counted in your spending"
+          onPress={() => router.replace('/pay/failed')}
+        />
+        <Pressable
+          role="button"
+          onPress={() => {
+            router.dismissAll();
+            router.replace('/');
+          }}
+          className="h-14 flex-row items-center justify-center gap-2"
+        >
+          <Clock size={18} strokeWidth={1.8} color={t.muted} />
+          <Text className="font-semibold text-base text-muted">Not sure, ask me later</Text>
+        </Pressable>
+      </View>
+    </SafeAreaView>
+  );
+}
