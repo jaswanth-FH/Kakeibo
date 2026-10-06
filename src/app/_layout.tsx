@@ -16,6 +16,8 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Text } from '@/components/ui/text';
+import { DatabaseProvider } from '@/db/provider';
 import { themes } from '@/lib/theme';
 import { useThemeName } from '@/lib/use-tokens';
 
@@ -44,9 +46,21 @@ export default function RootLayout() {
   return (
     <View style={[{ flex: 1 }, themeVars[theme]]}>
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: themes[theme].bg } }}
-      />
+      <DatabaseProvider
+        fallback={(e) => (
+          <View className="flex-1 justify-center gap-2 bg-bg px-5">
+            <Text className="font-bold text-lg">Couldn&apos;t open your data</Text>
+            <Text className="text-muted">{e.message}</Text>
+          </View>
+        )}
+      >
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: themes[theme].bg },
+          }}
+        />
+      </DatabaseProvider>
     </View>
   );
 }

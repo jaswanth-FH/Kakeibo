@@ -8,7 +8,7 @@ Read these before writing code:
 
 - `docs/spec.md`: every screen, its states and its route
 - `docs/design-tokens.md`: colors, type, radii, and the Tailwind theme
-- `docs/data-model.md`: SQLite schema (Drizzle), categories, auto-tagging rules
+- `docs/data-model.md`: SQLite schema, categories (schema now lives in `src/db/migrations/*.sql`; Kysely, not Drizzle), auto-tagging rules
 - `docs/upi-native-module.md`: the Kotlin Expo module that launches UPI apps and returns the result
 - `docs/build-plan.md`: milestones in order, with acceptance criteria
 - `docs/design/`: PNG exports of every screen. Match them closely.
@@ -19,7 +19,8 @@ Read these before writing code:
 - **Development build** (`expo-dev-client`). Expo Go cannot run the custom UPI module.
 - **NativeWind** + **React Native Reusables** (shadcn-style components for RN). Components are copied into `src/components/ui/` and restyled to our tokens.
 - **expo-camera** for QR scanning (`CameraView` with `barcodeScannerSettings`), and `scanFromURLAsync` for QR images picked with **expo-image-picker**
-- **expo-sqlite** with SQLCipher enabled + **drizzle-orm** (`useLiveQuery` for reactive screens)
+- **expo-sqlite** with SQLCipher enabled + **Kysely** (plain SQL migrations in `src/db/migrations/`, types in `src/db/types.ts`)
+- **Cloudflare Worker + D1** for backup/sync only, in the separate `Kakeibo-sync` repo (sibling folder). Its row types in `src/types.ts` must match `src/db/types.ts` here. The phone's SQLite is the source of truth; the app must work offline.
 - **expo-secure-store** holds the database encryption key
 - **expo-local-authentication** for the optional app lock
 - **react-native-svg** for the donut chart and icons. Charts are hand-built, not from a chart library.
@@ -36,7 +37,7 @@ src/components/ui/       React Native Reusables components, restyled
 src/components/          app components (TxnRow, CategoryDot, Donut, CompareBar, PillButton…)
 src/features/pay/        payment draft store, UPI link parse/build, status handling
 src/features/insights/   aggregation queries (monthly totals, comparisons)
-src/db/                  drizzle schema, migrations, client, seed categories
+src/db/                  SQL migrations, Kysely types and client, seed categories
 src/lib/                 money formatting, dates, tokens
 modules/upi-intent/      local Expo module (Kotlin + TS bindings, stays at root)
 docs/                    specs (this kit)
@@ -47,7 +48,7 @@ docs/                    specs (this kit)
 ```
 npx expo run:android      build and run the dev client on a device or emulator
 npx expo start --dev-client
-npx drizzle-kit generate  create a migration after a schema change
+add src/db/migrations/NNNN_name.sql   schema change (append-only; mirror synced columns in Kakeibo-sync)
 npm test                  jest unit tests
 ```
 
