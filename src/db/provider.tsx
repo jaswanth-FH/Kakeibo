@@ -62,9 +62,14 @@ export function useLiveQuery<T>(
 ): T | undefined {
   const db = useDb();
   const [data, setData] = useState<T>();
+  const [error, setError] = useState<unknown>();
   useEffect(() => {
     let alive = true;
-    const run = () => query(db).then((r) => alive && setData(r));
+    const run = () =>
+      query(db).then(
+        (r) => alive && setData(r),
+        (e) => alive && setError(e),
+      );
     run();
     const sub = addDatabaseChangeListener(run);
     return () => {
@@ -73,6 +78,7 @@ export function useLiveQuery<T>(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, ...deps]);
+  if (error) throw error; // to the route's error boundary instead of a blank screen
   return data;
 }
 

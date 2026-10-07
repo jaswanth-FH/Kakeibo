@@ -28,6 +28,9 @@ export function parseUpiUri(text: string): ParsedUpi | null {
   if (cu && cu.toUpperCase() !== 'INR') return null;
   const am = get('am');
   if (am && !(Number(am) > 0)) return null;
+  const sign = get('sign');
+  // A signed link can't be changed, so without its own amount there's no way to pay what the user types.
+  if (sign && !am) return null;
   return {
     rawUri: raw,
     pa,
@@ -37,7 +40,7 @@ export function parseUpiUri(text: string): ParsedUpi | null {
     tn: get('tn'),
     tr: get('tr'),
     mc: get('mc'),
-    sign: get('sign'),
+    sign,
   };
 }
 
@@ -46,12 +49,13 @@ export const amountToPaise = (am: string) => Math.round(Number(am) * 100);
 /** The link handed to the UPI app. Merchant QRs (amount or signature) go through unchanged. */
 export function buildPayUri(d: ParsedUpi, amountPaise: number, note?: string): string {
   if (d.am || d.sign) return d.rawUri;
-  const q = new URLSearchParams({
-    pa: d.pa,
-    ...(d.pn ? { pn: d.pn } : {}),
-    am: (amountPaise / 100).toFixed(2),
-    cu: 'INR',
-    ...(note ? { tn: note.slice(0, 50) } : {}),
-  });
-  return `upi://pay?${q.toString()}`;
+  const q: [string, string][] = [
+    ['pa', d.pa],
+    ...(d.pn ? [['pn', d.pn] as [string, string]] : []),
+    ['am', (amountPaise / 100).toFixed(2)],
+    ['cu', 'INR'],
+    ...(note ? [['tn', note.slice(0, 50)] as [string, string]] : []),
+  ];
+  // encodeURIComponent, not URLSearchParams: some UPI apps show a '+' for a space literally.
+  return `upi://pay?${q.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')}`;
 }

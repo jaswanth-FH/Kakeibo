@@ -1,12 +1,13 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Clock } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CategoryLabel, categoryOf, StatusCircle } from '@/components/receipt/Receipt';
 import { Text } from '@/components/ui/text';
+import { useCategories, useDb, useLiveQuery } from '@/db/provider';
 import { SAMPLE_DRAFT } from '@/db/sample';
-import { SEED_CATEGORIES } from '@/db/seed';
+import { markByUser } from '@/features/pay/status';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
@@ -38,8 +39,34 @@ function Answer({
 
 export default function Confirm() {
   const t = useTokens();
-  const d = SAMPLE_DRAFT;
-  const category = categoryOf(d.categoryId, SEED_CATEGORIES);
+  const db = useDb();
+  const { list: categories } = useCategories();
+  // ?id= comes from a pending row in History/Home. Without it this is still the M5 mockup.
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const txn = useLiveQuery(
+    (db) =>
+      id
+        ? db.selectFrom('transactions').selectAll().where('id', '=', id).executeTakeFirst()
+        : Promise.resolve(undefined),
+    [id],
+  );
+  if (id && !txn) return <SafeAreaView className="flex-1 bg-bg" />;
+  if (!categories.length) return <SafeAreaView className="flex-1 bg-bg" />;
+
+  const d = txn
+    ? {
+        payeeName: txn.payeeName ?? txn.payeeVpa,
+        amountPaise: txn.amountPaise,
+        categoryId: txn.categoryId,
+        upiApp: txn.upiApp ?? 'Your UPI app',
+      }
+    : SAMPLE_DRAFT;
+  const category = categoryOf(d.categoryId, categories);
+  const answer = async (paid: boolean) => {
+    if (!txn) return router.replace(paid ? '/pay/success' : '/pay/failed');
+    await markByUser(db, txn.id, paid);
+    router.replace({ pathname: '/txn/[id]', params: { id: txn.id } });
+  };
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <View className="flex-1 gap-6 px-5 pt-16">
@@ -71,17 +98,18 @@ export default function Confirm() {
           ok
           title="Yes, it's paid"
           subtitle={`Saved to ${category.name}`}
-          onPress={() => router.replace('/pay/success')}
+          onPress={() => answer(true)}
         />
         <Answer
           ok={false}
           title="No, it failed"
           subtitle="Nothing is counted in your spending"
-          onPress={() => router.replace('/pay/failed')}
+          onPress={() => answer(false)}
         />
         <Pressable
           role="button"
           onPress={() => {
+            if (txn) return router.back();
             router.dismissAll();
             router.replace('/');
           }}

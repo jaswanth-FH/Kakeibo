@@ -114,7 +114,7 @@ export default function Compare() {
         )}
 
         {rows.map((c) => {
-          const pct = pctChange(c.current, c.previous);
+          const pct = c.pctChange === null ? null : Math.round(c.pctChange);
           const category = cat(c.categoryId);
           return (
             <View key={c.categoryId} className="gap-1.5">
@@ -127,10 +127,9 @@ export default function Compare() {
                   <Text className="font-semibold text-base">{category?.name}</Text>
                 </View>
                 <Text
-                  className={`font-bold text-base ${pct > 0 ? 'text-up-text' : pct < 0 ? 'text-ok-text' : 'text-muted'}`}
+                  className={`font-bold text-base ${pct === null || pct > 0 ? 'text-up-text' : pct < 0 ? 'text-ok-text' : 'text-muted'}`}
                 >
-                  {pct > 0 ? '+' : ''}
-                  {pct}%
+                  {pct === null ? 'New' : `${pct > 0 ? '+' : ''}${pct}%`}
                 </Text>
               </View>
               <Bar paise={c.current} max={max} color={category?.color ?? t.muted} />

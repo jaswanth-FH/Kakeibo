@@ -82,7 +82,10 @@ export async function dailyGroups(db: Db, filters: HistoryFilters = {}): Promise
     .$if(!!search, (q) =>
       q.where((eb) =>
         eb.or(
-          (['payeeName', 'note', 'payeeVpa'] as const).map((c) => eb(c, 'like', `%${search}%`)),
+          // instr, not LIKE, so '%' and '_' in the search are plain characters.
+          (['payeeName', 'note', 'payeeVpa'] as const).map((c) =>
+            eb(eb.fn('instr', [eb.fn('lower', [c]), eb.val(search!.toLowerCase())]), '>', 0),
+          ),
         ),
       ),
     )

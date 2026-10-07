@@ -124,6 +124,17 @@ describe('dailyGroups', () => {
     expect(groups[0].txns[0].status).toBe('failed'); // 20:00 before 09:00
   });
 
+  test('treats % and _ in the search as plain characters, case-insensitively', async () => {
+    await txn(new Date(2026, 9, 1), 'food', 100, { payeeName: 'Chai_Point' });
+    await txn(new Date(2026, 9, 1), 'food', 100, { payeeName: '100% Juice' });
+    await txn(new Date(2026, 9, 1), 'food', 100, { payeeName: 'Swiggy' });
+    const names = async (search: string) =>
+      (await dailyGroups(db, { search })).flatMap((g) => g.txns.map((x) => x.payeeName));
+    expect(await names('_')).toEqual(['Chai_Point']);
+    expect(await names('%')).toEqual(['100% Juice']);
+    expect(await names('CHAI')).toEqual(['Chai_Point']);
+  });
+
   test('filters by search (name, note, VPA), category and status', async () => {
     await txn(new Date(2026, 9, 6), 'food', 10000, { payeeName: 'Swiggy' });
     await txn(new Date(2026, 9, 6), 'travel', 20000, { note: 'Airport cab' });

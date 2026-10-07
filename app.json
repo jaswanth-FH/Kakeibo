@@ -18,7 +18,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Kakeibo"
+      "package": "com.anonymous.Kakeibo",
+      "allowBackup": false
     },
     "plugins": [
       "expo-router",

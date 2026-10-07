@@ -19,7 +19,7 @@ export function TxnRow({ txn, category }: { txn: Transaction; category?: Categor
       className="min-h-[60px] flex-row items-center gap-3 py-2 active:opacity-70"
       onPress={() =>
         txn.status === 'pending'
-          ? router.push('/pay/confirm')
+          ? router.push({ pathname: '/pay/confirm', params: { id: txn.id } })
           : router.push({ pathname: '/txn/[id]', params: { id: txn.id } })
       }
     >

@@ -46,7 +46,7 @@ export default function TxnDetail() {
       ) : null}
       {txn?.status === 'pending' ? (
         <View className="px-5 pb-4">
-          <Button onPress={() => router.push('/pay/confirm')}>
+          <Button onPress={() => router.push({ pathname: '/pay/confirm', params: { id: txn.id } })}>
             <Text>Did it go through?</Text>
           </Button>
         </View>
