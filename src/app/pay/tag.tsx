@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,32 +7,55 @@ import { PayeeLetter, PayHeader } from '@/components/pay/PayParts';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { SAMPLE_DRAFT } from '@/db/sample';
-import { SEED_CATEGORIES } from '@/db/seed';
+import { useCategories, useDb, useLiveQuery } from '@/db/provider';
+import { usePayDraft } from '@/features/pay/draft';
+import { savePayeeRule, suggestCategory } from '@/features/pay/suggest';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 import { cn } from '@/lib/utils';
 
-const d = SAMPLE_DRAFT;
-const suggested = SEED_CATEGORIES.find((c) => c.id === d.categoryId);
-const shortPayee = d.payeeName.split(',')[0];
-
 export default function Tag() {
   const t = useTokens();
-  const [categoryId, setCategoryId] = useState<string | undefined>(suggested?.id);
-  const [note, setNote] = useState('Charger for MacBook');
-  const [always, setAlways] = useState(true);
-  const selected = SEED_CATEGORIES.find((c) => c.id === categoryId);
+  const db = useDb();
+  const d = usePayDraft((s) => s.draft);
+  const update = usePayDraft((s) => s.update);
+  const categories = useCategories();
+  const vpa = d?.payeeVpa ?? '';
+  // null = loaded, nothing to suggest.
+  const suggestedId = useLiveQuery(
+    async (db) => (await suggestCategory(db, vpa, d?.merchantCode)) ?? null,
+    [vpa, d?.merchantCode],
+  );
+  const [picked, setPicked] = useState(d?.categoryId);
+  const [note, setNote] = useState(d?.note ?? '');
+  const [alwaysToggle, setAlways] = useState<boolean>();
+  if (!d?.amountPaise) return <Redirect href="/scan" />;
+
+  const suggested = categories.find((c) => c.id === suggestedId);
+  const categoryId = picked ?? suggested?.id;
+  const selected = categories.find((c) => c.id === categoryId);
+  // Default on when the user moved off the suggestion; nothing to save when they kept it.
+  const always = alwaysToggle ?? categoryId !== suggested?.id;
+  const name = d.payeeName ?? d.payeeVpa;
+  const shortPayee = name.split(',')[0];
+
+  const pay = async () => {
+    if (!categoryId) return;
+    update({ categoryId, note: note.trim() || undefined });
+    // ponytail: rule saved on tapping Pay, not after the payment succeeds; move into the M5 pay step if that matters.
+    if (always) await savePayeeRule(db, d.payeeVpa, categoryId);
+    router.push('/pay/choose-app');
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <PayHeader title="Tag this payment" />
       <ScrollView contentContainerClassName="px-5 pb-6 pt-2" keyboardShouldPersistTaps="handled">
         <View className="flex-row items-center gap-3">
-          <PayeeLetter name={d.payeeName} color={suggested?.color ?? t['surface-2']} size={44} />
+          <PayeeLetter name={name} color={selected?.color ?? t['surface-2']} size={44} />
           <View className="flex-1">
             <Text className="font-semibold text-lg" numberOfLines={1}>
-              {d.payeeName}
+              {name}
             </Text>
             <Text className="text-[14px] text-muted" numberOfLines={1}>
               {d.payeeVpa}
@@ -46,7 +69,7 @@ export default function Tag() {
           {suggested && <Text className="text-[14px] text-muted">Suggested: {suggested.name}</Text>}
         </View>
         <View className="-m-1 flex-row flex-wrap">
-          {SEED_CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const on = c.id === categoryId;
             return (
               <View key={c.id} className="w-1/4 p-1">
@@ -54,7 +77,7 @@ export default function Tag() {
                   role="radio"
                   aria-checked={on}
                   accessibilityLabel={c.name}
-                  onPress={() => setCategoryId(c.id)}
+                  onPress={() => setPicked(c.id)}
                   className={cn(
                     'h-[76px] items-center justify-center gap-1.5 rounded-tile border-[1.5px] bg-surface',
                     on ? 'border-text' : 'border-transparent',
@@ -100,7 +123,7 @@ export default function Tag() {
         )}
       </ScrollView>
       <View className="gap-2 px-5 pb-4">
-        <Button disabled={!selected} onPress={() => router.push('/pay/choose-app')}>
+        <Button disabled={!selected} onPress={pay}>
           <Text>Pay {formatPaise(d.amountPaise)}</Text>
         </Button>
         <Text className="text-center text-[13px] text-muted">
