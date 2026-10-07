@@ -1,0 +1,57 @@
+export type ParsedUpi = {
+  rawUri: string;
+  pa: string;
+  pn?: string;
+  am?: string;
+  cu?: string;
+  tn?: string;
+  tr?: string;
+  mc?: string;
+  sign?: string;
+};
+
+export const VPA = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9.\-]{1,64}$/;
+
+/** A scanned QR's text → its UPI fields, or null if it isn't a payable INR `upi://pay` link. */
+export function parseUpiUri(text: string): ParsedUpi | null {
+  const raw = text.trim();
+  if (!/^upi:\/\/pay\?/i.test(raw)) return null;
+  const params = new URLSearchParams(raw.slice(raw.indexOf('?') + 1));
+  // Keys are case-insensitive in the wild (PA=, Am=).
+  const get = (k: string) => {
+    for (const [key, v] of params) if (key.toLowerCase() === k) return v.trim() || undefined;
+    return undefined;
+  };
+  const pa = get('pa');
+  if (!pa || !VPA.test(pa)) return null;
+  const cu = get('cu');
+  if (cu && cu.toUpperCase() !== 'INR') return null;
+  const am = get('am');
+  if (am && !(Number(am) > 0)) return null;
+  return {
+    rawUri: raw,
+    pa,
+    pn: get('pn'),
+    am,
+    cu,
+    tn: get('tn'),
+    tr: get('tr'),
+    mc: get('mc'),
+    sign: get('sign'),
+  };
+}
+
+export const amountToPaise = (am: string) => Math.round(Number(am) * 100);
+
+/** The link handed to the UPI app. Merchant QRs (amount or signature) go through unchanged. */
+export function buildPayUri(d: ParsedUpi, amountPaise: number, note?: string): string {
+  if (d.am || d.sign) return d.rawUri;
+  const q = new URLSearchParams({
+    pa: d.pa,
+    ...(d.pn ? { pn: d.pn } : {}),
+    am: (amountPaise / 100).toFixed(2),
+    cu: 'INR',
+    ...(note ? { tn: note.slice(0, 50) } : {}),
+  });
+  return `upi://pay?${q.toString()}`;
+}
