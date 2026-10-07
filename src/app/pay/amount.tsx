@@ -1,17 +1,17 @@
 import { router } from 'expo-router';
 import { Delete } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PayeeLetter, PayHeader } from '@/components/pay/PayParts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { SEED_CATEGORIES } from '@/db/seed';
+import { usePayDraft } from '@/features/pay/draft';
+import { parseUpiUri, VPA } from '@/features/pay/upiUri';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
-const PAYEE = { name: 'Rohan Mehta', vpa: 'rohan.m@okaxis' };
 const CAP_PAISE = 1_00_000_00;
 const QUICK_ADD = [100_00, 500_00, 1_000_00];
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
@@ -24,6 +24,13 @@ const toPaise = (s: string) => {
 
 export default function Amount() {
   const t = useTokens();
+  const draft = usePayDraft((s) => s.draft);
+  const start = usePayDraft((s) => s.start);
+  const update = usePayDraft((s) => s.update);
+  // No draft = arrived from "Enter UPI ID": ask for the VPA first.
+  const manual = !draft;
+  const [vpa, setVpa] = useState('');
+  const vpaOk = VPA.test(vpa.trim());
   const [input, setInput] = useState('');
   const [capHit, setCapHit] = useState(false);
   const paise = toPaise(input);
@@ -47,6 +54,12 @@ export default function Amount() {
     setIfAllowed(next % 100 ? (next / 100).toFixed(2) : String(next / 100));
   };
 
+  const proceed = () => {
+    if (manual) start(parseUpiUri(`upi://pay?pa=${encodeURIComponent(vpa.trim())}`)!);
+    update({ amountPaise: paise });
+    router.push('/pay/tag');
+  };
+
   // Show what was typed, with Indian grouping on the rupee part (keeps a trailing "." while typing).
   const [rupees, decimals] = input.split('.');
   const shown =
@@ -56,20 +69,41 @@ export default function Amount() {
     <SafeAreaView className="flex-1 bg-bg">
       <PayHeader title="Pay" />
       <View className="px-5 pt-2">
-        <View className="flex-row items-center gap-3 rounded-card bg-surface p-[14px]">
-          <PayeeLetter
-            name={PAYEE.name}
-            color={SEED_CATEGORIES.find((c) => c.id === 'home')?.color ?? t['surface-2']}
-            size={44}
-          />
-          <View className="flex-1">
-            <Text className="font-semibold text-base">{PAYEE.name}</Text>
-            <Text className="text-[14px] text-muted">{PAYEE.vpa}</Text>
+        {manual ? (
+          <View className="gap-1.5">
+            <View className="h-14 justify-center rounded-card bg-surface px-[14px]">
+              <TextInput
+                value={vpa}
+                onChangeText={setVpa}
+                placeholder="name@bank"
+                placeholderTextColor={t.faint}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                accessibilityLabel="UPI ID"
+                className="font-sans text-base text-text"
+              />
+            </View>
+            {vpa.trim() !== '' && !vpaOk && (
+              <Text className="text-[13px] text-bad-text">Enter a UPI ID like name@bank</Text>
+            )}
           </View>
-          <View className="rounded-pill border border-chip-border px-2.5 py-1">
-            <Text className="text-[12px] text-muted">Personal QR</Text>
+        ) : (
+          <View className="flex-row items-center gap-3 rounded-card bg-surface p-[14px]">
+            <PayeeLetter
+              name={draft.payeeName ?? draft.payeeVpa}
+              color={t['surface-2']}
+              size={44}
+            />
+            <View className="flex-1">
+              <Text className="font-semibold text-base">{draft.payeeName ?? draft.payeeVpa}</Text>
+              <Text className="text-[14px] text-muted">{draft.payeeVpa}</Text>
+            </View>
+            <View className="rounded-pill border border-chip-border px-2.5 py-1">
+              <Text className="text-[12px] text-muted">Personal QR</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View className="mt-10 flex-row items-center justify-center">
           <Text
@@ -82,7 +116,9 @@ export default function Amount() {
         <Text className={`text-center text-[14px] ${capHit ? 'text-bad-text' : 'text-muted'}`}>
           {capHit
             ? `UPI payments are capped at ${formatPaise(CAP_PAISE)}.`
-            : 'This QR has no amount. Enter how much to send.'}
+            : manual
+              ? 'Enter how much to send.'
+              : 'This QR has no amount. Enter how much to send.'}
         </Text>
 
         <View className="mt-5 flex-row justify-center gap-2">
@@ -119,7 +155,7 @@ export default function Amount() {
         ))}
       </View>
       <View className="px-5 pb-4 pt-2">
-        <Button disabled={paise === 0} onPress={() => router.push('/pay/tag')}>
+        <Button disabled={paise === 0 || (manual && !vpaOk)} onPress={proceed}>
           <Text>Continue</Text>
         </Button>
       </View>

@@ -4,8 +4,10 @@ import { Share as RNShare, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { sampleCategoryTotals } from '@/db/sample';
+import { useLiveQuery } from '@/db/provider';
 import type { Category } from '@/db/seed';
+import { totalsByCategory } from '@/features/insights/queries';
+import { periodRange } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
@@ -58,7 +60,7 @@ export function StatusCircle({ ok, size = 96 }: { ok: boolean; size?: number }) 
   );
 }
 
-export function formatWhen(d: Date) {
+function formatWhen(d: Date) {
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return `${date}, ${time}`;
@@ -88,9 +90,10 @@ export function Receipt({
 }: Props) {
   const t = useTokens();
   const amount = formatPaise(amountPaise);
-  const totals = sampleCategoryTotals();
-  const monthAll = totals.reduce((s, c) => s + c.paise, 0);
-  const monthCat = totals.find((c) => c.id === category.id)?.paise ?? 0;
+  const totals =
+    useLiveQuery((db) => totalsByCategory(db, periodRange('month', when)), [when.getTime()]) ?? [];
+  const monthAll = totals.reduce((s, c) => s + c.totalPaise, 0);
+  const monthCat = totals.find((c) => c.categoryId === category.id)?.totalPaise ?? 0;
   const headline = {
     success: `${amount} paid`,
     failed: `${amount} failed`,

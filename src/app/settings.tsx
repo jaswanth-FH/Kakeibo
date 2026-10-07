@@ -7,6 +7,7 @@ import {
   CircleHelp,
   Cloud,
   CreditCard,
+  Database,
   Download,
   FileText,
   Lock,
@@ -18,15 +19,22 @@ import {
 } from 'lucide-react-native';
 import { useColorScheme } from 'nativewind';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/Avatar';
 import { SettingsGroup, SettingsRow } from '@/components/SettingsRow';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { setSetting } from '@/db/client';
+import { seedSampleMonths } from '@/db/dev-seed';
+import { useDb } from '@/db/provider';
 import { SAMPLE_PROFILE } from '@/db/sample';
+import type { Db } from '@/db/sqlite';
 import { SEED_CATEGORIES } from '@/db/seed';
+import { periodTotal } from '@/features/insights/queries';
+import { periodRange, previousRange } from '@/lib/dates';
+import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
 // ponytail: only Dark mode does anything; the other switches are local state until their milestones
@@ -36,8 +44,22 @@ function useDemoToggle(initial: boolean) {
   return { value, onChange };
 }
 
+async function seedAndReadBack(db: Db) {
+  const inserted = await seedSampleMonths(db);
+  const month = periodRange('month', new Date());
+  const [current, previous] = await Promise.all([
+    periodTotal(db, month),
+    periodTotal(db, previousRange('month', month)),
+  ]);
+  Alert.alert(
+    'Sample data',
+    `Inserted ${inserted} payments.\nThis month: ${formatPaise(current)}\nLast month: ${formatPaise(previous)}`,
+  );
+}
+
 export default function Settings() {
   const t = useTokens();
+  const db = useDb();
   const { colorScheme, setColorScheme } = useColorScheme();
   const chooseEveryTime = useDemoToggle(false);
   const backup = useDemoToggle(true);
@@ -79,7 +101,11 @@ export default function Settings() {
             subtitle="Off switches to the light theme"
             toggle={{
               value: colorScheme === 'dark',
-              onChange: (on) => setColorScheme(on ? 'dark' : 'light'),
+              onChange: (on) => {
+                const theme = on ? 'dark' : 'light';
+                setColorScheme(theme);
+                setSetting(db, 'theme', theme);
+              },
             }}
           />
         </SettingsGroup>
@@ -122,6 +148,16 @@ export default function Settings() {
           <SettingsRow icon={Bell} title="Pending payment reminders" toggle={reminders} />
           <SettingsRow icon={TrendingUp} title="Monthly summary" toggle={monthly} />
         </SettingsGroup>
+
+        {__DEV__ && (
+          <SettingsGroup label="Developer">
+            <SettingsRow
+              icon={Database}
+              title="Seed sample months"
+              onPress={() => seedAndReadBack(db)}
+            />
+          </SettingsGroup>
+        )}
 
         <SettingsGroup label="About">
           <SettingsRow icon={CircleHelp} title="Help & feedback" />

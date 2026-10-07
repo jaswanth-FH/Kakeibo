@@ -1,29 +1,27 @@
 import { Ellipsis, Search } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, SectionList, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TxnRow } from '@/components/TxnRow';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { SAMPLE_TODAY, SAMPLE_TXNS, sampleCategoryTotals } from '@/db/sample';
+import { useCategories, useLiveQuery } from '@/db/provider';
+import type { TxnStatus } from '@/db/types';
+import { dailyGroups, totalsByCategory } from '@/features/insights/queries';
+import { startOfDay } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
-// ponytail: filters in memory over sample rows; becomes a drizzle query with LIKE + status/category filters in M2.
-const FILTERS = [
-  { id: 'all', label: 'All' },
-  ...sampleCategoryTotals()
-    .slice(0, 3)
-    .map((c) => ({ id: c.id, label: c.name })),
+const ALL_TIME = { start: new Date(0), end: new Date(8.64e15) };
+const STATUSES: { id: TxnStatus; label: string }[] = [
   { id: 'failed', label: 'Failed' },
   { id: 'pending', label: 'Pending' },
 ];
 
 const DAY = 86_400_000;
 function dayLabel(d: Date) {
-  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const ago = Math.round((start(SAMPLE_TODAY) - start(d)) / DAY);
+  const ago = Math.round((+startOfDay(new Date()) - +startOfDay(d)) / DAY);
   if (ago === 0) return 'Today';
   if (ago === 1) return 'Yesterday';
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -34,25 +32,25 @@ export default function History() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const sections = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = SAMPLE_TXNS.filter(
-      (x) =>
-        (filter === 'all' || x.status === filter || x.categoryId === filter) &&
-        (!q || x.payeeName.toLowerCase().includes(q) || x.payeeVpa.toLowerCase().includes(q)),
-    ).sort((a, b) => +b.createdAt - +a.createdAt);
-    const groups = new Map<string, typeof rows>();
-    for (const x of rows) {
-      const key = dayLabel(x.createdAt);
-      groups.set(key, [...(groups.get(key) ?? []), x]);
-    }
-    return [...groups].map(([title, data]) => ({
-      title,
-      data,
-      // Failed payments never count toward spend.
-      total: data.filter((x) => x.status !== 'failed').reduce((s, x) => s + x.amountPaise, 0),
-    }));
-  }, [query, filter]);
+  const { cat } = useCategories();
+  const status = STATUSES.find((x) => x.id === filter)?.id;
+  const categoryId = filter === 'all' || status ? undefined : filter;
+
+  const topCategories =
+    useLiveQuery((db) => totalsByCategory(db, ALL_TIME), [])
+      ?.slice(0, 3)
+      .map((c) => ({ id: c.categoryId, label: cat(c.categoryId)?.name ?? c.categoryId })) ?? [];
+  const filters = [{ id: 'all', label: 'All' }, ...topCategories, ...STATUSES];
+
+  const groups = useLiveQuery(
+    (db) => dailyGroups(db, { search: query, categoryId, status }),
+    [query, categoryId, status],
+  );
+  const sections = (groups ?? []).map((g) => ({
+    title: dayLabel(g.day),
+    data: g.txns,
+    total: g.totalPaise,
+  }));
 
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
@@ -81,7 +79,7 @@ export default function History() {
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 px-5 py-2"
         >
-          {FILTERS.map((f) => (
+          {filters.map((f) => (
             <Pressable
               key={f.id}
               role="button"
@@ -111,8 +109,14 @@ export default function History() {
             <Text className="text-muted">-{formatPaise(section.total)}</Text>
           </View>
         )}
-        renderItem={({ item }) => <TxnRow txn={item} />}
-        ListEmptyComponent={<Text className="pt-10 text-center text-muted">No payments found</Text>}
+        renderItem={({ item }) => <TxnRow txn={item} category={cat(item.categoryId)} />}
+        ListEmptyComponent={
+          groups && (
+            <Text className="pt-10 text-center text-muted">
+              {query || filter !== 'all' ? 'No payments found' : 'No payments yet'}
+            </Text>
+          )
+        }
       />
     </SafeAreaView>
   );

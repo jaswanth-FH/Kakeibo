@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { ShieldCheck } from 'lucide-react-native';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,35 +6,46 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PayeeLetter, PayHeader } from '@/components/pay/PayParts';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { SAMPLE_DRAFT } from '@/db/sample';
-import { SEED_CATEGORIES } from '@/db/seed';
+import { useCategories, useLiveQuery } from '@/db/provider';
+import { usePayDraft } from '@/features/pay/draft';
+import { isMerchantCode, MCC_TO_CATEGORY } from '@/features/pay/mcc';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
-const d = SAMPLE_DRAFT;
-const category = SEED_CATEGORIES.find((c) => c.id === d.categoryId);
-// ponytail: hard-coded label for the sample mc; the real map lives in features/pay/mcc.ts (M2).
-const MERCHANT_TYPES: Record<string, string> = { '5732': 'Electronics' };
-
-const rows = [
-  ['UPI ID', d.payeeVpa],
-  ['Payee name', d.payeeName],
-  ['Order reference', d.txnRef],
-  ['Merchant type', MERCHANT_TYPES[d.merchantCode]],
-].filter((r): r is [string, string] => Boolean(r[1]));
-
 export default function Details() {
   const t = useTokens();
-  const isMerchant = Boolean(d.merchantCode) && d.merchantCode !== '0000';
+  const d = usePayDraft((s) => s.draft);
+  const { cat } = useCategories();
+  const vpa = d?.payeeVpa ?? '';
+  const rule = useLiveQuery(
+    (db) =>
+      db
+        .selectFrom('payeeRules')
+        .select('categoryId')
+        .where('payeeVpa', '=', vpa)
+        .executeTakeFirst(),
+    [vpa],
+  );
+  if (!d?.amountPaise) return <Redirect href="/scan" />;
+
+  const name = d.payeeName ?? d.payeeVpa;
+  const ruleColor = cat(rule?.categoryId)?.color;
+  const merchantType = cat(MCC_TO_CATEGORY[d.merchantCode ?? ''])?.name;
+  const rows = [
+    ['UPI ID', d.payeeVpa],
+    ['Payee name', d.payeeName],
+    ['Order reference', d.txnRef],
+    ['Merchant type', merchantType],
+  ].filter((r): r is [string, string] => Boolean(r[1]));
   return (
     <SafeAreaView className="flex-1 bg-bg">
       <PayHeader title="Pay" />
       <View className="flex-1 px-5">
         <View className="items-center pt-6">
-          <PayeeLetter name={d.payeeName} color={category?.color ?? t['surface-2']} size={72} />
-          <Text className="mt-3 font-bold text-[22px]">{d.payeeName}</Text>
+          <PayeeLetter name={name} color={ruleColor ?? t['surface-2']} size={72} />
+          <Text className="mt-3 text-center font-bold text-[22px]">{name}</Text>
           <Text className="mt-1 text-muted">{d.payeeVpa}</Text>
-          {isMerchant && (
+          {isMerchantCode(d.merchantCode) && (
             <View className="mt-2 flex-row items-center gap-1.5">
               <ShieldCheck size={14} strokeWidth={1.8} color={t['ok-text']} />
               <Text className="font-semibold text-[14px] text-ok-text">Merchant QR</Text>
