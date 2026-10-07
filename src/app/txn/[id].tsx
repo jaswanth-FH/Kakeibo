@@ -12,7 +12,7 @@ import { useTokens } from '@/lib/use-tokens';
 export default function TxnDetail() {
   const t = useTokens();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const categories = useCategories();
+  const { list: categories } = useCategories();
   // null = looked up and not found; undefined = still loading.
   const txn = useLiveQuery(
     async (db) =>

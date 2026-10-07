@@ -46,8 +46,7 @@ function greeting() {
 export default function Home() {
   const t = useTokens();
   const data = useLiveQuery(homeData, []);
-  const categories = useCategories();
-  const cat = (id: string) => categories.find((c) => c.id === id);
+  const { cat } = useCategories();
   if (!data) return <SafeAreaView className="flex-1 bg-bg" />;
   const { name, month, prevMonth, total, prevTotal, byCategory, riser, recent } = data;
   const diff = total - prevTotal;

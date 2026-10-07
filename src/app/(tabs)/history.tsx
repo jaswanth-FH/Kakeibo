@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import { useCategories, useLiveQuery } from '@/db/provider';
 import type { TxnStatus } from '@/db/types';
 import { dailyGroups, totalsByCategory } from '@/features/insights/queries';
+import { startOfDay } from '@/lib/dates';
 import { formatPaise } from '@/lib/money';
 import { useTokens } from '@/lib/use-tokens';
 
@@ -20,8 +21,7 @@ const STATUSES: { id: TxnStatus; label: string }[] = [
 
 const DAY = 86_400_000;
 function dayLabel(d: Date) {
-  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const ago = Math.round((start(new Date()) - start(d)) / DAY);
+  const ago = Math.round((+startOfDay(new Date()) - +startOfDay(d)) / DAY);
   if (ago === 0) return 'Today';
   if (ago === 1) return 'Yesterday';
   return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -32,8 +32,7 @@ export default function History() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
 
-  const categories = useCategories();
-  const cat = (id: string) => categories.find((c) => c.id === id);
+  const { cat } = useCategories();
   const status = STATUSES.find((x) => x.id === filter)?.id;
   const categoryId = filter === 'all' || status ? undefined : filter;
 

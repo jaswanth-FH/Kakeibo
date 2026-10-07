@@ -2,7 +2,7 @@ import { View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 
-export function initials(name: string) {
+function initials(name: string) {
   return name
     .split(/\s+/)
     .filter(Boolean)

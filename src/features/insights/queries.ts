@@ -32,7 +32,7 @@ export async function periodTotal(db: Db, range: Range): Promise<number> {
   return Number(row?.total ?? 0);
 }
 
-export type CategoryChange = {
+type CategoryChange = {
   categoryId: string;
   current: number;
   previous: number;
@@ -63,13 +63,13 @@ export async function topIncrease(db: Db, current: Range, previous: Range) {
   return grew.sort((a, b) => b.pctChange - a.pctChange)[0] ?? null;
 }
 
-export type HistoryFilters = {
+type HistoryFilters = {
   search?: string; // payee name, note or VPA
   categoryId?: string;
   status?: TxnStatus;
 };
 
-export type DayGroup = { day: Date; totalPaise: number; txns: Transaction[] };
+type DayGroup = { day: Date; totalPaise: number; txns: Transaction[] };
 
 /** History sections, newest first. Every status is listed; only successes count toward the day total. */
 export async function dailyGroups(db: Db, filters: HistoryFilters = {}): Promise<DayGroup[]> {

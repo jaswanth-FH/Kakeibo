@@ -2,7 +2,7 @@ import { useColorScheme } from 'nativewind';
 
 import { fixed, themes } from '@/lib/theme';
 
-export type ThemeName = keyof typeof themes;
+type ThemeName = keyof typeof themes;
 
 export function useThemeName(): ThemeName {
   return useColorScheme().colorScheme === 'light' ? 'light' : 'dark';

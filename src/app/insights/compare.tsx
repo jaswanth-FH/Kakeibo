@@ -55,8 +55,7 @@ export default function Compare() {
   const kind = params.kind ?? 'month';
   const range = periodRange(kind, params.start ? new Date(Number(params.start)) : new Date());
   const prev = previousRange(kind, range);
-  const categories = useCategories();
-  const cat = (id: string) => categories.find((c) => c.id === id);
+  const { cat } = useCategories();
   const data = useLiveQuery(
     async (db) => {
       const [rows, total, prevTotal] = await Promise.all([

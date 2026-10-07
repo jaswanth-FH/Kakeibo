@@ -15,7 +15,7 @@ import { useTokens } from '@/lib/use-tokens';
 export default function Details() {
   const t = useTokens();
   const d = usePayDraft((s) => s.draft);
-  const categories = useCategories();
+  const { cat } = useCategories();
   const vpa = d?.payeeVpa ?? '';
   const rule = useLiveQuery(
     (db) =>
@@ -29,8 +29,8 @@ export default function Details() {
   if (!d?.amountPaise) return <Redirect href="/scan" />;
 
   const name = d.payeeName ?? d.payeeVpa;
-  const ruleColor = categories.find((c) => c.id === rule?.categoryId)?.color;
-  const merchantType = categories.find((c) => c.id === MCC_TO_CATEGORY[d.merchantCode ?? ''])?.name;
+  const ruleColor = cat(rule?.categoryId)?.color;
+  const merchantType = cat(MCC_TO_CATEGORY[d.merchantCode ?? ''])?.name;
   const rows = [
     ['UPI ID', d.payeeVpa],
     ['Payee name', d.payeeName],

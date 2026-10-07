@@ -60,7 +60,7 @@ export function StatusCircle({ ok, size = 96 }: { ok: boolean; size?: number }) 
   );
 }
 
-export function formatWhen(d: Date) {
+function formatWhen(d: Date) {
   const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   return `${date}, ${time}`;

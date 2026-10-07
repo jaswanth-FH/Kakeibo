@@ -76,12 +76,12 @@ export function useLiveQuery<T>(
   return data;
 }
 
-/** All categories in display order, live from the categories table. Empty until loaded. */
+/** All categories in display order (live from the categories table) and a lookup by id. */
 export function useCategories() {
-  return (
+  const list =
     useLiveQuery(
       (db) => db.selectFrom('categories').selectAll().orderBy('sortOrder').execute(),
       [],
-    ) ?? []
-  );
+    ) ?? [];
+  return { list, cat: (id?: string) => list.find((c) => c.id === id) };
 }

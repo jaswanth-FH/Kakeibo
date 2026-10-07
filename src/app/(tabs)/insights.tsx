@@ -33,8 +33,7 @@ export default function Insights() {
   const prev = previousRange(kind, range);
   const next = nextRange(kind, range);
   const nextIsFuture = next.start > new Date();
-  const categories = useCategories();
-  const cat = (id: string) => categories.find((c) => c.id === id);
+  const { cat } = useCategories();
   const data = useLiveQuery(
     async (db) => {
       const [byCategory, total, prevTotal] = await Promise.all([

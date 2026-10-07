@@ -19,7 +19,7 @@ export default function Tag() {
   const db = useDb();
   const d = usePayDraft((s) => s.draft);
   const update = usePayDraft((s) => s.update);
-  const categories = useCategories();
+  const { list: categories, cat } = useCategories();
   const vpa = d?.payeeVpa ?? '';
   // null = loaded, nothing to suggest.
   const suggestedId = useLiveQuery(
@@ -31,9 +31,9 @@ export default function Tag() {
   const [alwaysToggle, setAlways] = useState<boolean>();
   if (!d?.amountPaise) return <Redirect href="/scan" />;
 
-  const suggested = categories.find((c) => c.id === suggestedId);
+  const suggested = cat(suggestedId ?? undefined);
   const categoryId = picked ?? suggested?.id;
-  const selected = categories.find((c) => c.id === categoryId);
+  const selected = cat(categoryId);
   // Default on when the user moved off the suggestion; nothing to save when they kept it.
   const always = alwaysToggle ?? categoryId !== suggested?.id;
   const name = d.payeeName ?? d.payeeVpa;
